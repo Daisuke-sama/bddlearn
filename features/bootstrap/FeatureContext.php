@@ -7,14 +7,29 @@ use Behat\ {
 };
 
 /**
- * Defines application features from the specific context.
+ * Defines some of Github API features and testing these.
  */
 class FeatureContext implements Context
 {
     /**
-     * @var
+     * @var Psr\Http\Message\ResponseInterface
      */
     protected $response = null;
+
+    /**
+     * @var string
+     */
+    protected $username = null;
+
+    /**
+     * @var string
+     */
+    protected $password = null;
+
+    /**
+     * @var GuzzleHttp\Client
+     */
+    protected $client = null;
 
     /**
      * Initializes context.
@@ -23,8 +38,10 @@ class FeatureContext implements Context
      * You can also pass arbitrary arguments to the
      * context constructor through behat.yml.
      */
-    public function __construct()
+    public function __construct($github_username, $github_password)
     {
+        $this->username = $github_username;
+        $this->password = $github_password;
     }
 
     /**
@@ -60,10 +77,58 @@ class FeatureContext implements Context
      */
     public function iExpectAtLeastResult($arg1)
     {
-        $data = json_decode($this->response->getBody(), true);
+        $data = $this->getBodyAsArrayFromJson();
         if ($data['total_count'] < $arg1) {
             throw new \Exception("We expected $arg1 result(s), but found {$data['total_count']} results.");
         }
     }
 
+
+    /**
+     * @Given I am an authenticated user
+     */
+    public function iAmAnAuthenticatedUser()
+    {
+        $this->client = new GuzzleHttp\Client([
+            'base_uri' => 'https://api.github.com',
+            'auth' => [$this->username, $this->password]
+        ]);
+        $this->response = $this->client->get('/');
+
+        $this->iExpectResponseCode(200);
+    }
+
+    /**
+     * @When I request a list of my repositories
+     */
+    public function iRequestAListOfMyRepositories()
+    {
+        $this->response = $this->client->get('user/repos');
+
+        $this->iExpectResponseCode(200);
+    }
+
+    /**
+     * @Then The result should include a repository name :arg1
+     */
+    public function theResultShouldIncludeARepositoryName($arg1)
+    {
+        $repositories = $this->getBodyAsArrayFromJson();
+
+        foreach ($repositories as $repository) {
+            if (($repository['name'] <=> $arg1) == 0) {
+                return true;
+            }
+        }
+
+        throw new Exception("The repo $arg1 didn't find in my repositories.");
+    }
+
+    /**
+     * @return mixed Returns body of response decoded
+     */
+    protected function getBodyAsArrayFromJson()
+    {
+        return json_decode($this->response->getBody(), true);
+    }
 }
