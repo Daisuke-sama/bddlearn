@@ -11,6 +11,9 @@ use Behat\ {
  */
 class FeatureContext implements Context
 {
+    /*-----------------------
+      ---------VARS----------
+      -----------------------*/
     /**
      * @var Psr\Http\Message\ResponseInterface
      */
@@ -31,6 +34,10 @@ class FeatureContext implements Context
      */
     protected $client = null;
 
+
+    /*------------------------
+      ---------FUNCS----------
+      ------------------------*/
     /**
      * Initializes context.
      *
@@ -124,6 +131,21 @@ class FeatureContext implements Context
         throw new Exception("The repo $arg1 didn't find in my repositories.");
     }
 
+    /**
+     * @When I create the :arg1 repository
+     */
+    public function iCreateTheRepository($arg1)
+    {
+        $parameters = json_encode(['name' => $arg1]);
+        
+        $this->response = $this->client->post('/user/repos', ['body' => $parameters]);
+
+        $this->iExpectResponseCode(201);
+    }
+
+    /*-------------------------
+      ---------HIDDEN----------
+      -------------------------*/
     /**
      * @return mixed Returns body of response decoded
      */
