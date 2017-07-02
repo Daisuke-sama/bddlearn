@@ -36,28 +36,34 @@ class FeatureContext implements Context
     }
 
     /**
-     * @When I search for behat
+     * @When I search for :arg1
      */
-    public function iSearchForBehat()
+    public function iSearchFor($arg1)
     {
         $client = new GuzzleHttp\Client(['base_uri' => 'https://api.github.com']);
-        $this->response = $client->get('/search/repositories?q=behat124gfsgdsfg');
-	}
+        $this->response = $client->get('/search/repositories?q=' . $arg1);
+    }
 
     /**
-     * @Then I get a result
+     * @Then I expect :arg1 response code
      */
-    public function iGetAResult()
+    public function iExpectResponseCode($arg1)
     {
         $response_code = $this->response->getStatusCode();
-
-        if ($response_code <> 200) {
-            throw new Exception("It didn't work. We expected a 200 response, but got a " . $response_code);
-        }
-
-        $data = json_decode($this->response->getBody(), true);
-        if ($data['total_count'] == 0) {
-            throw new \Exception("We found zero results.");
+        if ($response_code <> $arg1) {
+            throw new Exception("It didn't work. We expected a $arg1 response, but got a " . $response_code);
         }
     }
+
+    /**
+     * @Then I expect at least :arg1 result
+     */
+    public function iExpectAtLeastResult($arg1)
+    {
+        $data = json_decode($this->response->getBody(), true);
+        if ($data['total_count'] < $arg1) {
+            throw new \Exception("We expected $arg1 result(s), but found {$data['total_count']} results.");
+        }
+    }
+
 }
