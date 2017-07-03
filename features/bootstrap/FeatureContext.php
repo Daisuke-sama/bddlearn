@@ -102,7 +102,7 @@ class FeatureContext implements Context
         ]);
         $this->response = $this->client->get('/');
 
-        $this->iExpectResponseCode(200);
+        $this->iExpectedASuccessfulRequest();
     }
 
     /**
@@ -122,11 +122,16 @@ class FeatureContext implements Context
     {
         $repositories = $this->getBodyAsArrayFromJson();
 
-        foreach ($repositories as $repository) {
-            if (($repository['name'] <=> $arg1) == 0) {
-                return true;
+        if (!isset($repositories['name'])) {
+            foreach ($repositories as $repository) {
+                if ($repository['name'] == $arg1) {
+                    return true;
+                }
             }
+        } else if ($repositories['name'] == $arg1) {
+            return true;
         }
+
 
         throw new Exception("The repo $arg1 didn't find in my repositories.");
     }
@@ -137,11 +142,66 @@ class FeatureContext implements Context
     public function iCreateTheRepository($arg1)
     {
         $parameters = json_encode(['name' => $arg1]);
-        
+
         $this->response = $this->client->post('/user/repos', ['body' => $parameters]);
 
-        $this->iExpectResponseCode(201);
+        $this->iExpectedASuccessfulRequest();
     }
+
+    /**
+     * @Given I have a repository called :arg1
+     */
+    public function iHaveARepositoryCalled($arg1)
+    {
+        $this->iCreateTheRepository($arg1);
+        $this->theResultShouldIncludeARepositoryName($arg1);
+    }
+
+    /**
+     * @When I watch the :arg1 repository
+     */
+    public function iWatchTheRepository($arg1)
+    {
+        $watch_url = '/repos/' . $this->username . '/' . $arg1 . '/subscription';
+        $parameters = json_encode(['subscribed' => 'true']);
+
+        $this->response = $this->client->put($watch_url, ['body' => $parameters]);
+
+        $this->iExpectedASuccessfulRequest();
+    }
+
+    /**
+     * @Then The :arg1 repository will list me as a watcher
+     */
+    public function theRepositoryWillListMeAsAWatcher($arg1)
+    {
+        // TODO: need refactor for this as we have some duplicate code with other function
+        $watch_url = '/repos/' . $this->username . '/' . $arg1 . '/subscribers';
+        $this->response = $this->client->get($watch_url);
+
+        $subscribers = $this->getBodyAsArrayFromJson();
+
+        foreach ($subscribers as $subscriber) {
+            if (strcmp($subscriber['login'], $this->username) == 0) {
+                return true;
+            }
+        }
+
+        throw new Exception("Did not find '{$this->username}' in watcher list");
+    }
+
+    /**
+     * @Then I delete repository called :arg1
+     */
+    public function iDeleteRepositoryCalled($arg1)
+    {
+        $delete_url = '/repos/' . $this->username . '/' . $arg1;
+        $this->response = $this->client->delete($delete_url);
+
+        $this->iExpectedASuccessfulRequest();
+    }
+
+
 
     /*-------------------------
       ---------HIDDEN----------
@@ -152,5 +212,35 @@ class FeatureContext implements Context
     protected function getBodyAsArrayFromJson()
     {
         return json_decode($this->response->getBody(), true);
+    }
+
+    protected function iExpectedASuccessfulRequest()
+    {
+        $c = $this->response->getStatusCode();
+        switch ($c) {
+            case 200 :
+            case 201 :
+            case 204 : {
+                return true;
+            }
+        }
+
+        throw new Exception("Didn't receive a success, but $c");
+    }
+
+    protected function iExpectedAFailedRequest()
+    {
+        $c = $this->response->getStatusCode();
+        switch ($c) {
+            case 400 :
+            case 401 :
+            case 403 :
+            case 404 :
+            case 405 : {
+                return true;
+            }
+        }
+
+        throw new Exception("Didn't receive a fail, but $c");
     }
 }
