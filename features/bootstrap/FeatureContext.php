@@ -34,6 +34,11 @@ class FeatureContext implements Context
      */
     protected $client = null;
 
+    /**
+     * @var array
+     */
+    protected $table = null;
+
 
     /*------------------------
       ---------FUNCS----------
@@ -199,6 +204,58 @@ class FeatureContext implements Context
         $this->response = $this->client->delete($delete_url);
 
         $this->iExpectedASuccessfulRequest();
+    }
+
+    /**
+     * @Given I have a following repositories:
+     */
+    public function iHaveAFollowingRepositories(TableNode $table)
+    {
+        $this->table = $table->getTable();
+
+        array_shift($this->table);
+
+        foreach ($this->table as $id => $row) {
+            $this->table[$id]['name'] = $row[0] . '/' . $row[1];
+
+            $this->response = $this->client->get('/repos/' . $row[0] . '/' . $row[1]);
+
+            $this->iExpectedASuccessfulRequest();
+        }
+    }
+
+    /**
+     * @When I watch this repositories
+     */
+    public function iWatchThisRepositories()
+    {
+        $parameters = json_encode(['subscribed' => 'true']);
+
+        foreach ($this->table as $row) {
+            $watch_url = '/repos/' . $row['name'] . '/subscription';
+            $this->client->put($watch_url, ['body' => $parameters]);
+        }
+    }
+
+    /**
+     * @Then My watch list includes those repositories
+     */
+    public function myWatchListIncludesThoseRepositories()
+    {
+        $watch_url = '/repos/' . $this->username . '/subscription';
+        $this->response = $this->client->get($watch_url);
+
+        $watches = $this->getBodyAsArrayFromJson();
+
+        foreach ($this->table as $row) {
+            foreach ($watches as $watch) {
+                if ($row['name'] == $watch['full_name']) {
+                    break 2;
+                }
+            }
+
+            throw new Exception('Error! ' . $this->username . ' is not watchig ' . $row['name']);
+        }
     }
 
 
